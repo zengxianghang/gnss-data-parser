@@ -1,6 +1,19 @@
-"""u-blox and NMEA-related parsers.
+"""u-blox and NMEA-related parsers."""
 
-RMC support is planned first. Binary u-blox message parsers should live in
-message-specific modules and follow the same streaming/record conventions as
-the rest of the package.
-"""
+from .rmc import (
+    NmeaParseError,
+    RmcRecord,
+    iter_rmc,
+    nmea_checksum,
+    parse_rmc_line,
+    read_rmc,
+)
+
+__all__ = [
+    "NmeaParseError",
+    "RmcRecord",
+    "iter_rmc",
+    "nmea_checksum",
+    "parse_rmc_line",
+    "read_rmc",
+]
