@@ -79,11 +79,16 @@ class GnssLogStats:
 
 @dataclass(frozen=True, slots=True)
 class GnssLogEvent:
-    """One parsed record yielded by :func:`iter_gnss_log`."""
+    """One parsed record yielded by :func:`iter_gnss_log`.
+
+    ``raw_line`` preserves the exact source line text after newline removal.
+    It is primarily useful for validation/debugging and adds no extra file scan.
+    """
 
     message_type: str
     record: object
     line_number: int
+    raw_line: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +210,7 @@ def iter_gnss_log(
             message_type=key,
             record=record,
             line_number=line_number,
+            raw_line=line,
         )
 
 
