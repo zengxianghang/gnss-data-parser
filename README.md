@@ -5,58 +5,73 @@ Reusable parsers for fixed-format GNSS logs and the **single source of truth** f
 ## Core rules
 
 - parsing only; analysis/plotting stays downstream
-- streaming-first `iter_*` APIs for multi-GB logs
+- streaming-first APIs for multi-GB logs
 - stable semantic field names
 - preserve source time tags and units
 - no hidden status/quality filtering
 - representative tests and PR-based changes
 
-## Test
+## Language support
+
+| Message / capability | Python | MATLAB |
+|---|---:|---:|
+| NovAtel standard ASCII header | ✅ | ✅ |
+| NovAtel CRC32 | ✅ | ✅ |
+| PSRVELA | ✅ | ✅ |
+| RANGEA + tracking status | ✅ | ✅ |
+| INSPVAA | ✅ | ✅ |
+| BESTPOSA | ✅ | ✅ |
+| BESTVELA | ✅ | ✅ |
+| NMEA/u-blox RMC | ✅ | ✅ |
+| Streaming large-file API | ✅ | ✅ |
+
+Python uses `iter_*` / `read_*`. MATLAB uses `scanNovatel*` / `readNovatel*` and `scanUbloxRmc` / `readUbloxRmc`.
+
+## Tests
+
+Python CI:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-## Supported NovAtel OEM ASCII parsers
+MATLAB self-tests:
 
-- common standard ASCII header/envelope and optional CRC32 verification
-- `PSRVELA`
-- `RANGEA` with decoded channel tracking status
-- `INSPVAA` with exact data-block applicability time plus preserved header time
-- `BESTPOSA` with position/std/satellite-count/status-mask fields
-- `BESTVELA` with preserved latency and source header time
-
-## Supported u-blox / NMEA parsers
-
-- RMC (`$xxRMC`) with `GP`/`GN` and other alphanumeric talker IDs
-- optional NMEA XOR checksum verification
-- signed decimal-degree coordinates plus preserved UTC/date semantics
-- invalid (`V`) records are preserved rather than hidden
-
-Example:
-
-```python
-from gnss_parser.ublox import iter_rmc
-
-for rmc in iter_rmc("ublox.log"):
-    print(rmc.utc_time, rmc.status, rmc.latitude_deg, rmc.longitude_deg, rmc.speed_knots)
+```matlab
+addpath('matlab');
+addpath('matlab/tests');
+testNovatelAscii;
+testPsrvel;
+testRange;
+testInspva;
+testBestposBestvel;
+testRmc;
+testCrossLanguageConsistency;
 ```
 
-See [`docs/parser_interface.md`](docs/parser_interface.md), [`docs/novatel.md`](docs/novatel.md), and [`docs/ublox.md`](docs/ublox.md).
+`tests/fixtures/cross_language/sample.log` and `expected.json` are the shared sanitized regression source. Python CI validates the manifest automatically. MATLAB `testCrossLanguageConsistency` consumes the same log and manifest, preventing the two language implementations from silently drifting in field meanings, units or time semantics.
 
-## Initial message roadmap
+The cross-language MATLAB regression uses `jsondecode` (MATLAB R2016b+); the parser functions themselves do not depend on `jsondecode`.
 
-NovAtel:
+## Supported semantics
 
-- [x] common standard ASCII header
-- [x] PSRVEL
-- [x] RANGE
-- [x] INSPVA
-- [x] BESTPOS
-- [x] BESTVEL
+### NovAtel
 
-u-blox / NMEA:
+- standard `#...A` ASCII envelope with exact message-name matching
+- optional CRC verification
+- PSRVEL/BESTVEL preserve header time and latency separately
+- RANGE preserves every syntactically valid observation and decoded/raw tracking status
+- INSPVA preserves exact data-block applicability time plus header time
+- BESTPOS preserves MSL height and undulation separately
 
-- [x] RMC
+### u-blox / NMEA
+
+- direct `$xxRMC` sentences with alphanumeric talker IDs such as `GP` and `GN`
+- optional XOR checksum verification
+- signed decimal-degree coordinates plus source UTC/date semantics
+- invalid (`V`) records are preserved
+- parser does not infer UTC century or convert UTC to GPST
+
+See [`docs/parser_interface.md`](docs/parser_interface.md), [`docs/novatel.md`](docs/novatel.md), [`docs/ublox.md`](docs/ublox.md), and [`matlab/README.md`](matlab/README.md).
 
 Development remains pre-1.0 until the parser interfaces have been exercised against representative real logs.

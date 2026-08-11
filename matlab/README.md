@@ -25,10 +25,6 @@ For multi-GB logs use the corresponding `scanNovatel*` or `scanUbloxRmc` callbac
 - RMC invalid (`V`) records and empty fix fields are preserved. Missing numeric RMC values are represented by `NaN` in MATLAB.
 - No parser silently filters solution status, INS status, CN0, lock time or fix validity.
 
-## RMC
-
-`readUbloxRmc` and `scanUbloxRmc` accept standard `$xxRMC` talker IDs such as `GP` and `GN`. The record exposes talker ID, UTC text/seconds-of-day, validity status, decimal-degree latitude/longitude, speed in knots, course, date, magnetic variation, position mode, navigation status and checksum. NMEA XOR checksum verification is opt-in through `VerifyChecksum`.
-
 ## Common layer and streaming
 
 `gnssparser.novatel.parseAsciiLine`, `peekMessageName`, `crc32`, and `gnssparser.common.scanTargetLines` provide the NovAtel low-level implementation. `gnssparser.nmea.checksum`, `peekRmc`, and `parseRmcLine` provide the NMEA layer.
@@ -44,7 +40,10 @@ testRange;
 testInspva;
 testBestposBestvel;
 testRmc;
+testCrossLanguageConsistency;
 ```
+
+`testCrossLanguageConsistency` reads the same sanitized `tests/fixtures/cross_language/sample.log` and `expected.json` that Python CI uses. This regression test requires `jsondecode` (MATLAB R2016b+); normal parser functions do not.
 
 ## Rules
 
