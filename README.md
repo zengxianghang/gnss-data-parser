@@ -30,13 +30,9 @@ gnss-data-parser/
 └─ tests/
 ```
 
-The first implementation focuses on the Python package and shared interface conventions. MATLAB/C++ implementations can be added while keeping equivalent output semantics.
-
 ## Python package
 
 The package currently has no third-party runtime dependency.
-
-From the repository root:
 
 ```bash
 python -m unittest discover -s tests -v
@@ -46,15 +42,15 @@ For local imports without installing the package, add `python/` to `PYTHONPATH`.
 
 ## Parser API convention
 
-Message-specific modules expose two levels of API:
-
 ```python
-from gnss_parser.novatel import iter_psrvel, read_psrvel
+from gnss_parser.novatel import iter_psrvel, iter_range
 
 for record in iter_psrvel("receiver.log"):
     process(record)
 
-records = read_psrvel("small_receiver.log")
+for epoch in iter_range("receiver.log"):
+    for obs in epoch.observations:
+        process_observation(obs)
 ```
 
 `iter_*` is the primary API for large files. `read_*` is a convenience wrapper that returns all records.
@@ -69,14 +65,25 @@ See [`docs/parser_interface.md`](docs/parser_interface.md) for the detailed cont
 - exact message-name matching
 - optional NovAtel CRC32 verification
 - `PSRVELA`
+- `RANGEA`, including decoded channel tracking status
 
-Example:
+Example RANGE quality fields:
 
 ```python
-from gnss_parser.novatel import iter_psrvel
+from gnss_parser.novatel import iter_range
 
-for record in iter_psrvel("receiver.log", strict=False, verify_crc=False):
-    print(record.week, record.sow, record.hor_speed_mps, record.vert_speed_mps)
+for epoch in iter_range("receiver.log"):
+    for obs in epoch.observations:
+        print(
+            epoch.week,
+            epoch.sow,
+            obs.prn,
+            obs.tracking.satellite_system_name,
+            obs.tracking.signal_name,
+            obs.cn0_dbhz,
+            obs.lock_time_s,
+            obs.tracking.phase_locked,
+        )
 ```
 
 See [`docs/novatel.md`](docs/novatel.md) for field semantics and timing behavior.
@@ -87,7 +94,7 @@ NovAtel:
 
 - [x] common standard ASCII header
 - [x] PSRVEL
-- [ ] RANGE
+- [x] RANGE
 - [ ] INSPVA
 - [ ] BESTPOS
 - [ ] BESTVEL
