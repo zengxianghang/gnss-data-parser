@@ -23,4 +23,4 @@ __all__ = [
     "normalize_message_selection",
     "read_gnss_log",
 ]
-__version__ = "0.8.0"
+__version__ = "0.9.0"
