@@ -56,12 +56,15 @@ while true
     try
         record = parseByKey(key,line,opts.VerifyCrc,opts.VerifyChecksum);
         stats.records.(key) = stats.records.(key) + 1;
-        if isfield(handlers,key) && ~isempty(handlers.(key))
-            if opts.PassSourceInfo
-                source = struct('line_number',stats.total_lines,'raw_line',line);
-                handlers.(key)(record,source);
-            else
-                handlers.(key)(record);
+        if isfield(handlers,key)
+            callback = handlers.(key);
+            if ~isempty(callback)
+                if opts.PassSourceInfo
+                    source = struct('line_number',stats.total_lines,'raw_line',line);
+                    callback(record,source);
+                else
+                    callback(record);
+                end
             end
         end
     catch err
