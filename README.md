@@ -24,14 +24,15 @@ python -m unittest discover -s tests -v
 - `RANGEA` with decoded channel tracking status
 - `INSPVAA` with exact data-block applicability time plus preserved header time
 - `BESTPOSA` with position/std/satellite-count/status-mask fields
+- `BESTVELA` with preserved latency and source header time
 
 Typical usage:
 
 ```python
-from gnss_parser.novatel import iter_bestpos, iter_inspva, iter_psrvel, iter_range
+from gnss_parser.novatel import iter_bestpos, iter_bestvel, iter_inspva, iter_psrvel, iter_range
 
-for pos in iter_bestpos("receiver.log"):
-    print(pos.week, pos.sow, pos.latitude_deg, pos.longitude_deg, pos.msl_height_m, pos.used_sv)
+for vel in iter_bestvel("receiver.log"):
+    print(vel.week, vel.sow, vel.latency_s, vel.hor_speed_mps, vel.vert_speed_mps)
 ```
 
 See [`docs/parser_interface.md`](docs/parser_interface.md) and [`docs/novatel.md`](docs/novatel.md).
@@ -45,7 +46,7 @@ NovAtel:
 - [x] RANGE
 - [x] INSPVA
 - [x] BESTPOS
-- [ ] BESTVEL
+- [x] BESTVEL
 
 u-blox / NMEA:
 

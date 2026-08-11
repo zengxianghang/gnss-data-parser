@@ -9,6 +9,7 @@ This document records the format assumptions used by `gnss_parser.novatel`.
 - RANGE: <https://docs.novatel.com/OEM7/Content/Logs/RANGE.htm>
 - INSPVA: <https://docs.novatel.com/OEM7/Content/SPAN_Logs/INSPVA.htm>
 - BESTPOS: <https://docs.novatel.com/OEM7/Content/Logs/BESTPOS.htm>
+- BESTVEL: <https://docs.novatel.com/OEM7/Content/Logs/BESTVEL.htm>
 
 The implementation targets standard `#...A` ASCII messages. CRC verification is opt-in for large-file scans.
 
@@ -22,33 +23,25 @@ Returns immutable epochs/observations with raw and decoded channel tracking stat
 
 ## INSPVAA
 
-`InspvaRecord.week/sow` use the INS data-block applicability time. `header_week/header_sow` preserve the standard header time tag. Latitude/longitude, ellipsoidal height, N/E/U velocity, roll/pitch/azimuth and INS status are exposed without hidden status filtering.
+`InspvaRecord.week/sow` use the INS data-block applicability time. `header_week/header_sow` preserve the standard header time tag. Position, N/E/U velocity, attitude and INS status are exposed without hidden filtering.
 
 ## BESTPOSA
+
+Returns all 21 ASCII body fields including MSL height and undulation separately, position standard deviations, satellite counts and status/signal masks. No implicit MSL-to-ellipsoidal conversion or solution filtering is performed.
+
+## BESTVELA
 
 Public APIs:
 
 ```python
-from gnss_parser.novatel import iter_bestpos, parse_bestpos_line, read_bestpos
+from gnss_parser.novatel import iter_bestvel, parse_bestvel_line, read_bestvel
 ```
 
-`BestposRecord` exposes the complete standard header plus:
+`BestvelRecord` exposes solution status/type, `latency_s`, differential age, horizontal speed, track over ground relative to True North, vertical speed (positive up), reserved field, CRC and the complete standard header.
 
-- solution status and position type
-- latitude/longitude in degrees
-- `msl_height_m` exactly as logged
-- `undulation_m` exactly as logged
-- datum
-- latitude/longitude/height standard deviations in metres
-- base-station ID
-- differential age and solution age
-- tracked, used, L1-used and multi-frequency-used satellite counts
-- reserved byte, extended solution status, Galileo/BeiDou signal mask, GPS/GLONASS signal mask
-- CRC
+The header week/SOW is preserved exactly. NovAtel defines the improved time of validity as header time minus latency; the parser deliberately does not apply that shift implicitly.
 
-The parser deliberately does not convert MSL height plus undulation into an ellipsoidal height field. Downstream code that needs that derived quantity must calculate it explicitly.
-
-A syntactically valid record is returned regardless of solution status/type; `SOL_COMPUTED` filtering belongs to analysis code.
+A syntactically valid record is returned regardless of solution status/type.
 
 ## Streaming behavior
 
