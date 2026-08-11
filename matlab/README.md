@@ -1,6 +1,6 @@
 # MATLAB parsers
 
-MATLAB is a first-class parser target alongside Python. The MATLAB implementation must keep field meanings, units and raw-time semantics aligned with `docs/parser_interface.md` and the Python implementation.
+MATLAB is a first-class parser target alongside Python. Field meanings, units and raw-time semantics must stay aligned with `docs/parser_interface.md` and the Python implementation.
 
 ## Common layer
 
@@ -25,12 +25,19 @@ Header week/SOW and latency remain separate; no hidden solution filtering is app
 
 ```matlab
 epochs = readNovatelRange('receiver.log');
-scanNovatelRange('receiver.log', @consumeEpoch, 'Strict', false, 'VerifyCrc', false);
+scanNovatelRange('receiver.log', @consumeEpoch);
 ```
 
-Each RANGE epoch contains `week`, `sow`, `time_status`, `observation_count`, `observations`, `crc`, and the complete header. Each observation exposes PRN, GLONASS frequency representation, pseudorange/std, ADR/std, Doppler, C/N0, lock time, and decoded `tracking` status.
+Each epoch contains raw observations and fully decoded tracking status with no hidden observation-quality filtering.
 
-`tracking.raw` preserves the original 32-bit channel status. The decoded struct matches Python semantics for tracking state, SV channel, phase/parity/code lock, correlator type, satellite system/name, grouping, signal type/name, primary L1, half-cycle, digital filter, PRN lockout, and forced assignment. No CN0/lock/status filtering is performed.
+## INSPVA
+
+```matlab
+records = readNovatelInspva('receiver.log');
+scanNovatelInspva('receiver.log', @consumeIns);
+```
+
+`week` and `sow` are the INSPVA data-block applicability time. `header_week` and `header_sow` preserve the standard ASCII header time separately. Records expose latitude/longitude, ellipsoidal height, north/east/up velocity, roll/pitch/azimuth, INS status, CRC and full header. INS status is never silently filtered.
 
 ## Streaming large logs
 
@@ -44,6 +51,7 @@ addpath('matlab/tests');
 testNovatelAscii;
 testPsrvel;
 testRange;
+testInspva;
 ```
 
 ## Rules
