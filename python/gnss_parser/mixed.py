@@ -8,7 +8,7 @@ vendor-format parsing rules of its own.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterator, Sequence
+from typing import Iterable, Iterator, Sequence
 
 from gnss_parser.common.io import TextSource, iter_text_lines
 from gnss_parser.novatel.ascii import NovatelAsciiParseError, peek_ascii_message_name
@@ -98,20 +98,19 @@ class GnssLogResult:
         return self.records[key]
 
 
-def normalize_message_selection(messages: str | Sequence[str] | None) -> tuple[str, ...]:
+def normalize_message_selection(messages: str | Iterable[str] | None) -> tuple[str, ...]:
     """Normalize user-facing names to stable lower-case message keys.
 
     Examples accepted for NovAtel include ``RANGE``, ``RANGEA`` and ``range``.
     RMC accepts ``RMC`` and ``$xxRMC``. Unknown names are rejected explicitly.
+    Returned keys always follow ``SUPPORTED_MESSAGE_KEYS`` order, including
+    when the caller supplies an unordered container such as ``set``.
     """
     if messages is None:
         return SUPPORTED_MESSAGE_KEYS
-    if isinstance(messages, str):
-        values: Sequence[str] = (messages,)
-    else:
-        values = messages
+    values: Iterable[str] = (messages,) if isinstance(messages, str) else messages
 
-    selected: list[str] = []
+    selected_set: set[str] = set()
     for value in values:
         if not isinstance(value, str):
             raise TypeError("message names must be strings")
@@ -120,9 +119,8 @@ def normalize_message_selection(messages: str | Sequence[str] | None) -> tuple[s
         if key is None:
             supported = ", ".join(SUPPORTED_MESSAGE_KEYS)
             raise ValueError(f"unsupported message type {value!r}; supported keys: {supported}")
-        if key not in selected:
-            selected.append(key)
-    return tuple(selected)
+        selected_set.add(key)
+    return tuple(key for key in SUPPORTED_MESSAGE_KEYS if key in selected_set)
 
 
 def _identify_message(line: str) -> str | None:
@@ -161,7 +159,7 @@ def _parse_target_line(
 def iter_gnss_log(
     source: TextSource,
     *,
-    messages: str | Sequence[str] | None = None,
+    messages: str | Iterable[str] | None = None,
     strict: bool = False,
     verify_crc: bool = False,
     verify_checksum: bool = False,
@@ -213,7 +211,7 @@ def iter_gnss_log(
 def read_gnss_log(
     source: TextSource,
     *,
-    messages: str | Sequence[str] | None = None,
+    messages: str | Iterable[str] | None = None,
     strict: bool = False,
     verify_crc: bool = False,
     verify_checksum: bool = False,
