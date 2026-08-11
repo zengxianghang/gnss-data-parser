@@ -71,12 +71,14 @@ When a log contains mixed message types, parsers should reject non-matching line
 
 ## Error handling
 
-Each parser should eventually support two practical modes:
+Message iterators use two practical modes:
 
-- tolerant mode for large operational logs: skip unrelated/malformed lines and optionally collect counters;
-- strict mode for tests/debugging: raise a parser-specific exception containing message type and line number.
+- tolerant mode for large operational logs: skip unrelated lines and malformed records of the requested type;
+- strict mode for tests/debugging: raise a parser-specific exception containing the source line number when available.
 
-Exact exception/statistics types will be standardized when the first concrete message parser is added.
+The first concrete NovAtel implementation establishes `NovatelAsciiParseError` for standard OEM ASCII syntax/body errors. Direct single-line parsing is always strict. `iter_psrvel(..., strict=False)` is tolerant by default; `strict=True` raises on malformed `PSRVELA` records. Unrelated message names are skipped in either mode.
+
+Optional validation that has a meaningful processing cost, such as full CRC checking, should be explicit rather than silently enabled for every multi-GB scan.
 
 ## Testing requirements
 
