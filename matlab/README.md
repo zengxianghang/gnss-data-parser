@@ -12,37 +12,35 @@ name = gnssparser.novatel.peekMessageName(line);
 crc = gnssparser.novatel.crc32(payload);
 ```
 
-`parseAsciiLine` returns a struct containing:
+`parseAsciiLine` returns the complete standard header, untyped body fields and CRC. CRC verification is opt-in so multi-GB scans do not pay the cost unless requested.
 
-- `header.message`
-- `header.port`
-- `header.sequence`
-- `header.idle_time_pct`
-- `header.time_status`
-- `header.week`
-- `header.sow`
-- `header.receiver_status`
-- `header.reserved`
-- `header.software_version`
-- `fields`
-- `crc`
+## PSRVEL
 
-CRC verification is opt-in so multi-GB scans do not pay the cost unless requested.
+Convenience collection:
+
+```matlab
+records = readNovatelPsrvel('receiver.log');
+```
+
+Streaming large files:
+
+```matlab
+scanNovatelPsrvel('receiver.log', @consume, 'Strict', false, 'VerifyCrc', false);
+```
+
+Each record exposes `week`, `sow`, `time_status`, `sol_status`, `vel_type`, `latency_s`, `age_s`, `hor_speed_mps`, `track_deg`, `vert_speed_mps`, `reserved`, `crc`, and the full `header` struct. Header time and latency are preserved separately; the reader does not silently shift the timestamp or filter non-computed solutions.
 
 ## Streaming large logs
 
 `gnssparser.common.scanTargetLines` reads a text log line by line, cheaply rejects unrelated message types, and calls a parser/callback only for the exact requested message. It supports `Strict` and `VerifyCrc` name/value options.
 
-Message-specific `read*` convenience functions will collect records for smaller files, while their callback/scan counterparts remain the preferred path for large logs.
-
 ## Tests
-
-Add the `matlab` directory to the MATLAB path, then run:
 
 ```matlab
 addpath('matlab');
 addpath('matlab/tests');
 testNovatelAscii;
+testPsrvel;
 ```
 
 ## Rules
