@@ -13,20 +13,9 @@ Collection API:
     'Messages', {'RANGE', 'PSRVEL', 'INSPVA'});
 ```
 
-`data` always has stable fields:
+`data` always has stable fields `psrvel`, `range`, `inspva`, `bestpos`, `bestvel`, and `rmc`. Unselected fields are empty. `stats` reports total/unrelated lines plus target, parsed, and malformed counts.
 
-```matlab
-data.psrvel
-data.range
-data.inspva
-data.bestpos
-data.bestvel
-data.rmc
-```
-
-Unselected message fields are empty. `stats` reports total/unrelated lines plus target, parsed, and malformed counts for every supported type.
-
-For multi-GB logs, prefer callback streaming so parsed records are not retained:
+For multi-GB logs, prefer callback streaming:
 
 ```matlab
 handlers = struct();
@@ -35,16 +24,52 @@ handlers.psrvel = @consumePsrvel;
 stats = scanGnssLog('receiver.log', handlers);
 ```
 
-`scanGnssLog` reads the source once, cheaply identifies the message type, and invokes only the corresponding existing parser. If the `Messages` option is omitted, nonempty handler fields determine the selected types; with no handlers, all supported types are selected.
-
 Options shared by the mixed API:
 
 - `'Messages'`: canonical keys or aliases such as `RANGE`, `RANGEA`, `PSRVEL`, `INSPVA`, `BESTPOS`, `BESTVEL`, `RMC`
 - `'Strict'`: raise on malformed selected records instead of counting/skipping them
 - `'VerifyCrc'`: opt-in NovAtel CRC32 verification
 - `'VerifyChecksum'`: opt-in NMEA checksum verification
+- `'PassSourceInfo'`: default false; when true, callback receives `(record, source)` where `source.line_number` and `source.raw_line` support validation/debugging without a second scan
 
 Unknown requested message names are rejected explicitly.
+
+## Real-log validation
+
+Use `validateRealLog` to validate the MATLAB parser on an actual receiver log and generate artifacts compatible with the Python validator.
+
+```matlab
+addpath('matlab');
+summary = validateRealLog('D:\data\receiver.log', ...
+    'VerifyCrc', true, ...
+    'VerifyChecksum', true);
+```
+
+Default output is `receiver_validation_matlab` beside the input file. It contains:
+
+```text
+summary.json
+psrvel.csv
+range.csv
+inspva.csv
+bestpos.csv
+bestvel.csv
+rmc.csv
+```
+
+By default the CSV files are deterministic samples: first 5 records, every 1000th record, and last 5 records. Every sampled row includes the original source line number and raw sentence. RANGE expands every observation from each sampled RANGE epoch and includes raw/decoded tracking status.
+
+Useful options:
+
+```matlab
+validateRealLog(file, 'Messages', {'RANGE','PSRVEL'});
+validateRealLog(file, 'SampleFirst', 10, 'SampleLast', 10, 'SampleEvery', 500);
+validateRealLog(file, 'FullExport', true);  % may be very large
+```
+
+Run the Python validator on the same source file, then compare both output directories with `tools/compare_validation_results.py`. Exact strings/integers and raw source lines must match; floating-point columns are compared with tolerance.
+
+The validation JSON tools require `jsonencode`/`jsondecode` (MATLAB R2016b+). Normal parser APIs do not require JSON support.
 
 ## Supported single-message readers
 
@@ -86,9 +111,10 @@ testBestposBestvel;
 testRmc;
 testCrossLanguageConsistency;
 testGnssLog;
+testValidateRealLog;
 ```
 
-`testCrossLanguageConsistency` reads the same sanitized `tests/fixtures/cross_language/sample.log` and `expected.json` that Python CI uses. This regression test requires `jsondecode` (MATLAB R2016b+); normal parser functions do not. `testGnssLog` verifies that mixed single-pass collection is equivalent to the existing individual readers and exercises subset/callback behavior.
+`testCrossLanguageConsistency` reads the shared sanitized fixture/manifest. `testGnssLog` verifies mixed single-pass collection against individual readers. `testValidateRealLog` verifies validation output generation, source-line preservation, RANGE flattening, and summary JSON.
 
 ## Rules
 
