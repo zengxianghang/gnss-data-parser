@@ -26,18 +26,25 @@ python -m unittest discover -s tests -v
 - `BESTPOSA` with position/std/satellite-count/status-mask fields
 - `BESTVELA` with preserved latency and source header time
 
-Typical usage:
+## Supported u-blox / NMEA parsers
+
+- RMC (`$xxRMC`) with `GP`/`GN` and other alphanumeric talker IDs
+- optional NMEA XOR checksum verification
+- signed decimal-degree coordinates plus preserved UTC/date semantics
+- invalid (`V`) records are preserved rather than hidden
+
+Example:
 
 ```python
-from gnss_parser.novatel import iter_bestpos, iter_bestvel, iter_inspva, iter_psrvel, iter_range
+from gnss_parser.ublox import iter_rmc
 
-for vel in iter_bestvel("receiver.log"):
-    print(vel.week, vel.sow, vel.latency_s, vel.hor_speed_mps, vel.vert_speed_mps)
+for rmc in iter_rmc("ublox.log"):
+    print(rmc.utc_time, rmc.status, rmc.latitude_deg, rmc.longitude_deg, rmc.speed_knots)
 ```
 
-See [`docs/parser_interface.md`](docs/parser_interface.md) and [`docs/novatel.md`](docs/novatel.md).
+See [`docs/parser_interface.md`](docs/parser_interface.md), [`docs/novatel.md`](docs/novatel.md), and [`docs/ublox.md`](docs/ublox.md).
 
-## Message roadmap
+## Initial message roadmap
 
 NovAtel:
 
@@ -50,6 +57,6 @@ NovAtel:
 
 u-blox / NMEA:
 
-- [ ] RMC
+- [x] RMC
 
-Development remains pre-1.0 until the initial parser set is stable.
+Development remains pre-1.0 until the parser interfaces have been exercised against representative real logs.
