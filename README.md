@@ -25,6 +25,7 @@ Reusable parsers for fixed-format GNSS logs and the **single source of truth** f
 | NMEA/u-blox RMC | ✅ | ✅ |
 | Single-message streaming API | ✅ | ✅ |
 | Multi-message single-pass API | ✅ | ✅ |
+| Real-log validation artifacts | ✅ | ✅ |
 
 ## Multi-message single-pass parsing
 
@@ -58,6 +59,8 @@ for event in iter_gnss_log(
     consume(event.message_type, event.record)
 ```
 
+`GnssLogEvent` also exposes `line_number` and `raw_line` for validation/debugging without rescanning the source.
+
 MATLAB collection:
 
 ```matlab
@@ -77,6 +80,46 @@ stats = scanGnssLog('receiver.log', handlers);
 Stable grouped keys are `psrvel`, `range`, `inspva`, `bestpos`, `bestvel`, and `rmc`. Configuration aliases such as `RANGE`/`RANGEA` are accepted; unsupported requested message names are rejected explicitly. NovAtel CRC and NMEA checksum verification remain opt-in.
 
 The existing single-message APIs remain supported. They are convenient when only one type is needed; avoid calling several of them sequentially on the same multi-GB file when the mixed-log API can perform one scan instead.
+
+## Validate against a real data file
+
+Synthetic fixtures are necessary but not sufficient. For a real receiver log, run both implementations against the same file and compare their normalized validation artifacts.
+
+Python:
+
+```bash
+python tools/validate_real_log.py D:\data\receiver.log --verify-crc --verify-checksum
+```
+
+MATLAB:
+
+```matlab
+addpath('matlab');
+validateRealLog('D:\data\receiver.log', ...
+    'VerifyCrc', true, 'VerifyChecksum', true);
+```
+
+Default output directories are `<stem>_validation_python` and `<stem>_validation_matlab`. Each contains `summary.json` plus one CSV per selected message type. The default CSV mode is deliberately sampled: first 5 records, every 1000th record, and last 5 records. Each sampled row contains the source line number and raw source sentence. For RANGE, every observation in a sampled epoch is flattened, including raw/decoded tracking status.
+
+Compare the two outputs:
+
+```bash
+python tools/compare_validation_results.py ^
+    D:\data\receiver_validation_python ^
+    D:\data\receiver_validation_matlab ^
+    --output D:\data\receiver_validation_compare.json
+```
+
+The comparator checks target/parsed/malformed counts, exact text/integer fields, source lines, and floating-point fields with a tolerance. Exit code 0 means PASS; a mismatch returns exit code 1 and reports the affected message/field.
+
+For exhaustive normalized CSV output, add `--full-export` in Python or `'FullExport', true` in MATLAB. This is intentionally opt-in because flattened RANGE output can be substantially larger than the original log.
+
+Recommended validation order:
+
+1. run parser unit/regression tests;
+2. run Python and MATLAB real-log validation on the same file;
+3. compare the generated validation directories;
+4. manually inspect sampled `raw_line` + parsed columns, especially RANGE, low-CN0/zero-lock records, invalid RMC fixes, malformed/partial records, and file beginning/end.
 
 ## Tests
 
@@ -99,11 +142,12 @@ testBestposBestvel;
 testRmc;
 testCrossLanguageConsistency;
 testGnssLog;
+testValidateRealLog;
 ```
 
-`tests/fixtures/cross_language/sample.log` and `expected.json` are the shared sanitized regression source. Python CI validates the manifest automatically. MATLAB `testCrossLanguageConsistency` consumes the same log and manifest, preventing the two language implementations from silently drifting in field meanings, units or time semantics. `testGnssLog` additionally checks that the single-pass mixed reader matches the existing individual MATLAB readers.
+`tests/fixtures/cross_language/sample.log` and `expected.json` are the shared sanitized regression source. Python CI validates the manifest automatically. MATLAB `testCrossLanguageConsistency` consumes the same log and manifest, preventing the two language implementations from silently drifting in field meanings, units or time semantics. `testGnssLog` additionally checks that the single-pass mixed reader matches the existing individual MATLAB readers. `testValidateRealLog` exercises the real-log validation output schema on the same fixture.
 
-The cross-language MATLAB regression uses `jsondecode` (MATLAB R2016b+); the parser functions themselves do not depend on `jsondecode`.
+The cross-language MATLAB regression and real-log JSON validation require `jsondecode`/`jsonencode` (MATLAB R2016b+); the parser functions themselves do not depend on JSON support.
 
 ## Supported semantics
 
