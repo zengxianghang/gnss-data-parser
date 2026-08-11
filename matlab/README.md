@@ -2,7 +2,51 @@
 
 MATLAB is a first-class parser target alongside Python. Field meanings, units and raw-time semantics must stay aligned with `docs/parser_interface.md` and the Python implementation.
 
-## Supported readers
+## Recommended mixed-log API
+
+When one file contains several needed message types, use the single-pass API instead of calling multiple single-message readers sequentially.
+
+Collection API:
+
+```matlab
+[data, stats] = readGnssLog('receiver.log', ...
+    'Messages', {'RANGE', 'PSRVEL', 'INSPVA'});
+```
+
+`data` always has stable fields:
+
+```matlab
+data.psrvel
+data.range
+data.inspva
+data.bestpos
+data.bestvel
+data.rmc
+```
+
+Unselected message fields are empty. `stats` reports total/unrelated lines plus target, parsed, and malformed counts for every supported type.
+
+For multi-GB logs, prefer callback streaming so parsed records are not retained:
+
+```matlab
+handlers = struct();
+handlers.range = @consumeRange;
+handlers.psrvel = @consumePsrvel;
+stats = scanGnssLog('receiver.log', handlers);
+```
+
+`scanGnssLog` reads the source once, cheaply identifies the message type, and invokes only the corresponding existing parser. If the `Messages` option is omitted, nonempty handler fields determine the selected types; with no handlers, all supported types are selected.
+
+Options shared by the mixed API:
+
+- `'Messages'`: canonical keys or aliases such as `RANGE`, `RANGEA`, `PSRVEL`, `INSPVA`, `BESTPOS`, `BESTVEL`, `RMC`
+- `'Strict'`: raise on malformed selected records instead of counting/skipping them
+- `'VerifyCrc'`: opt-in NovAtel CRC32 verification
+- `'VerifyChecksum'`: opt-in NMEA checksum verification
+
+Unknown requested message names are rejected explicitly.
+
+## Supported single-message readers
 
 ```matlab
 psrvel = readNovatelPsrvel('receiver.log');
@@ -13,7 +57,7 @@ bestvel = readNovatelBestvel('receiver.log');
 rmc = readUbloxRmc('receiver.log');
 ```
 
-For multi-GB logs use the corresponding `scanNovatel*` or `scanUbloxRmc` callback APIs instead of collecting the whole file.
+These remain useful when only one message type is needed. For large mixed logs requiring several types, prefer `readGnssLog`/`scanGnssLog` so the file is not rescanned once per type.
 
 ## Timing and filtering rules
 
@@ -27,7 +71,7 @@ For multi-GB logs use the corresponding `scanNovatel*` or `scanUbloxRmc` callbac
 
 ## Common layer and streaming
 
-`gnssparser.novatel.parseAsciiLine`, `peekMessageName`, `crc32`, and `gnssparser.common.scanTargetLines` provide the NovAtel low-level implementation. `gnssparser.nmea.checksum`, `peekRmc`, and `parseRmcLine` provide the NMEA layer.
+`gnssparser.novatel.parseAsciiLine`, `peekMessageName`, `crc32`, and `gnssparser.common.scanTargetLines` provide the NovAtel low-level implementation. `gnssparser.nmea.checksum`, `peekRmc`, and `parseRmcLine` provide the NMEA layer. `gnssparser.common.identifyGnssLine` and `normalizeMessageSelection` provide cheap mixed-log routing/configuration.
 
 ## Tests
 
@@ -41,9 +85,10 @@ testInspva;
 testBestposBestvel;
 testRmc;
 testCrossLanguageConsistency;
+testGnssLog;
 ```
 
-`testCrossLanguageConsistency` reads the same sanitized `tests/fixtures/cross_language/sample.log` and `expected.json` that Python CI uses. This regression test requires `jsondecode` (MATLAB R2016b+); normal parser functions do not.
+`testCrossLanguageConsistency` reads the same sanitized `tests/fixtures/cross_language/sample.log` and `expected.json` that Python CI uses. This regression test requires `jsondecode` (MATLAB R2016b+); normal parser functions do not. `testGnssLog` verifies that mixed single-pass collection is equivalent to the existing individual readers and exercises subset/callback behavior.
 
 ## Rules
 

@@ -23,9 +23,60 @@ Reusable parsers for fixed-format GNSS logs and the **single source of truth** f
 | BESTPOSA | ✅ | ✅ |
 | BESTVELA | ✅ | ✅ |
 | NMEA/u-blox RMC | ✅ | ✅ |
-| Streaming large-file API | ✅ | ✅ |
+| Single-message streaming API | ✅ | ✅ |
+| Multi-message single-pass API | ✅ | ✅ |
 
-Python uses `iter_*` / `read_*`. MATLAB uses `scanNovatel*` / `readNovatel*` and `scanUbloxRmc` / `readUbloxRmc`.
+## Multi-message single-pass parsing
+
+When one large mixed log contains several needed message types, prefer the mixed-log API so the source is scanned only once.
+
+Python collection:
+
+```python
+from gnss_parser import read_gnss_log
+
+result = read_gnss_log(
+    "receiver.log",
+    messages={"RANGE", "PSRVEL", "INSPVA"},
+)
+range_epochs = result["range"]
+psrvel = result["psrvel"]
+print(result.stats.total_lines, result.stats.records)
+```
+
+Python streaming:
+
+```python
+from gnss_parser import GnssLogStats, iter_gnss_log
+
+stats = GnssLogStats()
+for event in iter_gnss_log(
+    "receiver.log",
+    messages={"RANGE", "PSRVEL", "INSPVA"},
+    stats=stats,
+):
+    consume(event.message_type, event.record)
+```
+
+MATLAB collection:
+
+```matlab
+[data, stats] = readGnssLog('receiver.log', ...
+    'Messages', {'RANGE', 'PSRVEL', 'INSPVA'});
+```
+
+MATLAB streaming/callback processing:
+
+```matlab
+handlers = struct();
+handlers.range = @consumeRange;
+handlers.psrvel = @consumePsrvel;
+stats = scanGnssLog('receiver.log', handlers);
+```
+
+Stable grouped keys are `psrvel`, `range`, `inspva`, `bestpos`, `bestvel`, and `rmc`. Configuration aliases such as `RANGE`/`RANGEA` are accepted; unsupported requested message names are rejected explicitly. NovAtel CRC and NMEA checksum verification remain opt-in.
+
+The existing single-message APIs remain supported. They are convenient when only one type is needed; avoid calling several of them sequentially on the same multi-GB file when the mixed-log API can perform one scan instead.
 
 ## Tests
 
@@ -47,9 +98,10 @@ testInspva;
 testBestposBestvel;
 testRmc;
 testCrossLanguageConsistency;
+testGnssLog;
 ```
 
-`tests/fixtures/cross_language/sample.log` and `expected.json` are the shared sanitized regression source. Python CI validates the manifest automatically. MATLAB `testCrossLanguageConsistency` consumes the same log and manifest, preventing the two language implementations from silently drifting in field meanings, units or time semantics.
+`tests/fixtures/cross_language/sample.log` and `expected.json` are the shared sanitized regression source. Python CI validates the manifest automatically. MATLAB `testCrossLanguageConsistency` consumes the same log and manifest, preventing the two language implementations from silently drifting in field meanings, units or time semantics. `testGnssLog` additionally checks that the single-pass mixed reader matches the existing individual MATLAB readers.
 
 The cross-language MATLAB regression uses `jsondecode` (MATLAB R2016b+); the parser functions themselves do not depend on `jsondecode`.
 
