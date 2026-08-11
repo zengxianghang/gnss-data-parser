@@ -4,49 +4,52 @@ This document records the format assumptions used by `gnss_parser.novatel`.
 
 ## Authoritative references
 
-- Standard OEM ASCII message format: <https://docs.novatel.com/OEM7/Content/Messages/ASCII.htm>
+- Standard OEM ASCII: <https://docs.novatel.com/OEM7/Content/Messages/ASCII.htm>
 - PSRVEL: <https://docs.novatel.com/OEM7/Content/Logs/PSRVEL.htm>
 - RANGE: <https://docs.novatel.com/OEM7/Content/Logs/RANGE.htm>
 - INSPVA: <https://docs.novatel.com/OEM7/Content/SPAN_Logs/INSPVA.htm>
+- BESTPOS: <https://docs.novatel.com/OEM7/Content/Logs/BESTPOS.htm>
 
-The implementation targets the standard `#...A` ASCII format, not abbreviated ASCII and not binary messages.
-
-## Standard ASCII header and CRC
-
-`parse_ascii_line()` decodes the standard header into `NovatelAsciiHeader`. The header/data `;` delimiter and trailing `*xxxxxxxx` CRC field are required. Message matching is exact. `novatel_crc32()` implements the NovAtel CRC; verification remains opt-in for large-file scans.
+The implementation targets standard `#...A` ASCII messages. CRC verification is opt-in for large-file scans.
 
 ## PSRVELA
 
-`PsrvelRecord` exposes solution status/type, latency, differential age, horizontal speed, track over ground, vertical speed, reserved field, CRC and the complete standard header. Source header week/SOW is preserved and latency is not silently applied.
+Preserves source header time and latency separately; no hidden solution filtering.
 
 ## RANGEA
 
-Each `RangeRecord` represents one RANGE epoch and contains immutable `RangeObservation` objects. Each observation exposes PRN, GLONASS frequency representation, pseudorange/std, ADR/std, Doppler, C/N0, lock time and decoded channel tracking status. The raw 32-bit tracking word is also preserved. No observation-quality filtering is applied.
+Returns immutable epochs/observations with raw and decoded channel tracking status; no hidden observation-quality filtering.
 
 ## INSPVAA
+
+`InspvaRecord.week/sow` use the INS data-block applicability time. `header_week/header_sow` preserve the standard header time tag. Latitude/longitude, ellipsoidal height, N/E/U velocity, roll/pitch/azimuth and INS status are exposed without hidden status filtering.
+
+## BESTPOSA
 
 Public APIs:
 
 ```python
-from gnss_parser.novatel import iter_inspva, parse_inspva_line, read_inspva
+from gnss_parser.novatel import iter_bestpos, parse_bestpos_line, read_bestpos
 ```
 
-`InspvaRecord` exposes:
+`BestposRecord` exposes the complete standard header plus:
 
-- `header` — complete standard ASCII header
-- `week`, `sow` — GNSS week/SOW from the INSPVA data block
-- `header_week`, `header_sow` — header time tag
+- solution status and position type
 - latitude/longitude in degrees
-- ellipsoidal height in metres
-- north/east/up velocity in m/s
-- roll, pitch and azimuth in degrees
-- `ins_status`
+- `msl_height_m` exactly as logged
+- `undulation_m` exactly as logged
+- datum
+- latitude/longitude/height standard deviations in metres
+- base-station ID
+- differential age and solution age
+- tracked, used, L1-used and multi-frequency-used satellite counts
+- reserved byte, extended solution status, Galileo/BeiDou signal mask, GPS/GLONASS signal mask
 - CRC
 
-SPAN logs carry an INS time tag in the data block in addition to the log header. The data-block time is the exact time of applicability, so `InspvaRecord.week/sow` use that time while the header time remains separately accessible. No attempt is made to force the two time tags to match.
+The parser deliberately does not convert MSL height plus undulation into an ellipsoidal height field. Downstream code that needs that derived quantity must calculate it explicitly.
 
-No INS-status filtering is applied. Records such as alignment/inactive states remain available if syntactically valid.
+A syntactically valid record is returned regardless of solution status/type; `SOL_COMPUTED` filtering belongs to analysis code.
 
 ## Streaming behavior
 
-All message iterators scan incrementally and reject unrelated message names before full tokenization. Default tolerant mode skips malformed target-message records. `strict=True` raises `NovatelAsciiParseError` with the 1-based source line number. CRC validation is explicit through `verify_crc=True`.
+All iterators scan incrementally and reject unrelated message names before full tokenization. Tolerant mode skips malformed target records; `strict=True` raises `NovatelAsciiParseError` with source line number. CRC validation is explicit through `verify_crc=True`.
