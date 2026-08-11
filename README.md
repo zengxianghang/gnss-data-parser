@@ -15,7 +15,7 @@ The repository is intended to be the **single source of truth** for raw GNSS log
 7. **Test with representative lines** — every supported message type should have valid, malformed, boundary and regression cases.
 8. **PR workflow** — changes are developed on branches and merged through pull requests; `main` is the approved parser baseline.
 
-## Planned layout
+## Layout
 
 ```text
 gnss-data-parser/
@@ -46,7 +46,7 @@ For local imports without installing the package, add `python/` to `PYTHONPATH`.
 
 ## Parser API convention
 
-Message-specific modules should expose two levels of API:
+Message-specific modules expose two levels of API:
 
 ```python
 from gnss_parser.novatel import iter_psrvel, read_psrvel
@@ -61,19 +61,40 @@ records = read_psrvel("small_receiver.log")
 
 See [`docs/parser_interface.md`](docs/parser_interface.md) for the detailed contract.
 
-## Initial message roadmap
+## Supported parsers
+
+### NovAtel OEM ASCII
+
+- shared standard ASCII header/envelope parser
+- exact message-name matching
+- optional NovAtel CRC32 verification
+- `PSRVELA`
+
+Example:
+
+```python
+from gnss_parser.novatel import iter_psrvel
+
+for record in iter_psrvel("receiver.log", strict=False, verify_crc=False):
+    print(record.week, record.sow, record.hor_speed_mps, record.vert_speed_mps)
+```
+
+See [`docs/novatel.md`](docs/novatel.md) for field semantics and timing behavior.
+
+## Message roadmap
 
 NovAtel:
 
-- RANGE
-- PSRVEL
-- INSPVA
-- BESTPOS
-- BESTVEL
+- [x] common standard ASCII header
+- [x] PSRVEL
+- [ ] RANGE
+- [ ] INSPVA
+- [ ] BESTPOS
+- [ ] BESTVEL
 
 u-blox / NMEA:
 
-- RMC
+- [ ] RMC
 
 Additional formats should be added only with format documentation and tests.
 
