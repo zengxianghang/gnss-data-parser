@@ -2,46 +2,37 @@
 
 MATLAB is a first-class parser target alongside Python. Field meanings, units and raw-time semantics must stay aligned with `docs/parser_interface.md` and the Python implementation.
 
-## Common layer
+## Supported NovAtel readers
 
 ```matlab
-msg = gnssparser.novatel.parseAsciiLine(line, 'PSRVELA', true);
-name = gnssparser.novatel.peekMessageName(line);
-crc = gnssparser.novatel.crc32(payload);
+psrvel = readNovatelPsrvel('receiver.log');
+range = readNovatelRange('receiver.log');
+inspva = readNovatelInspva('receiver.log');
+bestpos = readNovatelBestpos('receiver.log');
+bestvel = readNovatelBestvel('receiver.log');
 ```
 
-CRC verification is opt-in for large-log performance.
+For multi-GB logs use the corresponding `scanNovatel*` callback APIs instead of collecting the whole file.
 
-## PSRVEL
+### Timing and filtering rules
 
-```matlab
-records = readNovatelPsrvel('receiver.log');
-scanNovatelPsrvel('receiver.log', @consume, 'Strict', false, 'VerifyCrc', false);
-```
+- PSRVEL/BESTVEL keep header week/SOW and latency separate; latency is not silently subtracted.
+- INSPVA `week`/`sow` are the data-block applicability time; header time remains in `header_week`/`header_sow`.
+- BESTPOS preserves MSL height and undulation separately; no implicit ellipsoidal-height conversion is performed.
+- RANGE preserves all observations and raw/decoded channel tracking status.
+- No parser silently filters solution status, INS status, CN0, lock time or fix validity.
 
-Header week/SOW and latency remain separate; no hidden solution filtering is applied.
+### BESTPOS fields
 
-## RANGE
+The MATLAB record mirrors Python fields for solution/position type, latitude/longitude, `msl_height_m`, `undulation_m`, datum, position standard deviations, station ID, ages, tracked/used satellite counts, reserved/extended status and signal masks.
 
-```matlab
-epochs = readNovatelRange('receiver.log');
-scanNovatelRange('receiver.log', @consumeEpoch);
-```
+### BESTVEL fields
 
-Each epoch contains raw observations and fully decoded tracking status with no hidden observation-quality filtering.
+The MATLAB record mirrors Python fields for solution/velocity type, `latency_s`, `age_s`, horizontal speed, track angle, vertical speed and reserved field.
 
-## INSPVA
+## Common layer and streaming
 
-```matlab
-records = readNovatelInspva('receiver.log');
-scanNovatelInspva('receiver.log', @consumeIns);
-```
-
-`week` and `sow` are the INSPVA data-block applicability time. `header_week` and `header_sow` preserve the standard ASCII header time separately. Records expose latitude/longitude, ellipsoidal height, north/east/up velocity, roll/pitch/azimuth, INS status, CRC and full header. INS status is never silently filtered.
-
-## Streaming large logs
-
-`gnssparser.common.scanTargetLines` reads line by line and cheaply rejects unrelated message names before full parsing.
+`gnssparser.novatel.parseAsciiLine`, `peekMessageName`, `crc32`, and `gnssparser.common.scanTargetLines` provide the shared low-level implementation. CRC verification is opt-in.
 
 ## Tests
 
@@ -52,6 +43,7 @@ testNovatelAscii;
 testPsrvel;
 testRange;
 testInspva;
+testBestposBestvel;
 ```
 
 ## Rules
