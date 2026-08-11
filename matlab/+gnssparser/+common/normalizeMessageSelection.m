@@ -1,7 +1,8 @@
 function keys = normalizeMessageSelection(messages)
 %NORMALIZEMESSAGESELECTION Normalize aliases to stable parser keys.
 %   KEYS = gnssparser.common.normalizeMessageSelection(MESSAGES)
-%   accepts canonical keys or vendor-style names such as RANGE/RANGEA.
+%   accepts canonical keys or vendor-style names such as RANGE/RANGEA and
+%   always returns keys in the repository's stable canonical order.
 
 allKeys = {'psrvel', 'range', 'inspva', 'bestpos', 'bestvel', 'rmc'};
 if nargin < 1 || isempty(messages)
@@ -17,7 +18,7 @@ elseif ~iscell(messages)
         'Messages must be a character vector, string array, or cell array.');
 end
 
-keys = {};
+selected = false(size(allKeys));
 for k = 1:numel(messages)
     value = messages{k};
     if isstring(value), value = char(value); end
@@ -42,8 +43,7 @@ for k = 1:numel(messages)
             error('gnssparser:UnsupportedMessage', ...
                 'Unsupported message type: %s.', value);
     end
-    if ~any(strcmp(keys, key))
-        keys{end + 1} = key; %#ok<AGROW>
-    end
+    selected(strcmp(allKeys, key)) = true;
 end
+keys = allKeys(selected);
 end
