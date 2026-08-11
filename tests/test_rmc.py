@@ -11,9 +11,14 @@ def sentence(payload: str, checksum: int | None = None) -> str:
 
 
 class RmcParserTests(unittest.TestCase):
-    def test_parse_ublox_example(self) -> None:
-        line = "$GPRMC,083559.00,A,4717.11437,N,00833.91522,E,0.004,77.52,091202,,,A,V*57"
-        record = parse_rmc_line(line, verify_checksum=True)
+    def test_known_nmea_checksum(self) -> None:
+        payload = "GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W"
+        self.assertEqual(nmea_checksum(payload), 0x6A)
+
+    def test_parse_ublox_field_shape(self) -> None:
+        payload = "GPRMC,083559.00,A,4717.11437,N,00833.91522,E,0.004,77.52,091202,,,A,V"
+        self.assertEqual(nmea_checksum(payload), 0x2D)
+        record = parse_rmc_line(sentence(payload), verify_checksum=True)
         self.assertEqual(record.talker_id, "GP")
         self.assertEqual(record.status, "A")
         self.assertAlmostEqual(record.utc_seconds_of_day, 8 * 3600 + 35 * 60 + 59.0)
