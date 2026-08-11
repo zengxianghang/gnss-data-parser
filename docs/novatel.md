@@ -7,70 +7,45 @@ This document records the format assumptions used by `gnss_parser.novatel`.
 - Standard OEM ASCII message format: <https://docs.novatel.com/OEM7/Content/Messages/ASCII.htm>
 - PSRVEL: <https://docs.novatel.com/OEM7/Content/Logs/PSRVEL.htm>
 - RANGE: <https://docs.novatel.com/OEM7/Content/Logs/RANGE.htm>
+- INSPVA: <https://docs.novatel.com/OEM7/Content/SPAN_Logs/INSPVA.htm>
 
 The implementation targets the standard `#...A` ASCII format, not abbreviated ASCII and not binary messages.
 
-## Standard ASCII header
+## Standard ASCII header and CRC
 
-`parse_ascii_line()` decodes the standard header into `NovatelAsciiHeader`:
-
-- `message`
-- `port`
-- `sequence`
-- `idle_time_pct`
-- `time_status`
-- `week`
-- `sow`
-- `receiver_status`
-- `reserved`
-- `software_version`
-
-The header/data `;` delimiter and trailing `*xxxxxxxx` CRC field are required. Message matching is exact.
-
-### CRC
-
-`novatel_crc32()` implements the NovAtel 32-bit CRC algorithm. Message parsers expose `verify_crc=False` by default so multi-GB processing does not pay the CRC cost unless the caller requests it.
+`parse_ascii_line()` decodes the standard header into `NovatelAsciiHeader`. The header/data `;` delimiter and trailing `*xxxxxxxx` CRC field are required. Message matching is exact. `novatel_crc32()` implements the NovAtel CRC; verification remains opt-in for large-file scans.
 
 ## PSRVELA
 
-Public APIs:
-
-```python
-from gnss_parser.novatel import iter_psrvel, parse_psrvel_line, read_psrvel
-```
-
-`PsrvelRecord` exposes solution status/type, latency, differential age, horizontal speed, track over ground, vertical speed, reserved field, CRC and the complete standard header.
-
-The source `week` and `sow` are preserved. NovAtel defines the PSRVEL time of validity as the header time tag minus the latency field; the parser deliberately does not modify the source timestamp automatically.
-
-No solution-quality filter is applied.
+`PsrvelRecord` exposes solution status/type, latency, differential age, horizontal speed, track over ground, vertical speed, reserved field, CRC and the complete standard header. Source header week/SOW is preserved and latency is not silently applied.
 
 ## RANGEA
 
+Each `RangeRecord` represents one RANGE epoch and contains immutable `RangeObservation` objects. Each observation exposes PRN, GLONASS frequency representation, pseudorange/std, ADR/std, Doppler, C/N0, lock time and decoded channel tracking status. The raw 32-bit tracking word is also preserved. No observation-quality filtering is applied.
+
+## INSPVAA
+
 Public APIs:
 
 ```python
-from gnss_parser.novatel import iter_range, parse_range_line, read_range
+from gnss_parser.novatel import iter_inspva, parse_inspva_line, read_inspva
 ```
 
-Each `RangeRecord` represents one RANGE epoch and contains a tuple of `RangeObservation` objects. The parser verifies that the declared observation count matches the exact number of observation fields.
+`InspvaRecord` exposes:
 
-Each observation exposes:
+- `header` — complete standard ASCII header
+- `week`, `sow` — GNSS week/SOW from the INSPVA data block
+- `header_week`, `header_sow` — header time tag
+- latitude/longitude in degrees
+- ellipsoidal height in metres
+- north/east/up velocity in m/s
+- roll, pitch and azimuth in degrees
+- `ins_status`
+- CRC
 
-- `prn`
-- `glofreq` — NovAtel GLONASS frequency representation (`frequency + 7`)
-- `pseudorange_m`, `pseudorange_std_m`
-- `adr_cycles`, `adr_std_cycles`
-- `doppler_hz`
-- `cn0_dbhz`
-- `lock_time_s`
-- `tracking` — decoded `TrackingStatus`
+SPAN logs carry an INS time tag in the data block in addition to the log header. The data-block time is the exact time of applicability, so `InspvaRecord.week/sow` use that time while the header time remains separately accessible. No attempt is made to force the two time tags to match.
 
-`TrackingStatus.raw` preserves the original 32-bit `ch-tr-status`. The decoded object also exposes tracking state, SV channel, phase/parity/code lock flags, correlator type, satellite system, signal type, grouping, primary-L1, half-cycle-added, digital-filter, PRN-lock and forced-assignment flags.
-
-`signal_name` is a convenience label derived from the OEM7 RANGE tracking-status table. The numeric `satellite_system` and `signal_type` remain the stable source values and must be preferred if future firmware introduces a signal code not yet named by this library.
-
-No quality filtering is applied: low CN0, zero lock time, unknown parity, non-locked tracking states and any constellation/signal are returned if the sentence is syntactically valid.
+No INS-status filtering is applied. Records such as alignment/inactive states remain available if syntactically valid.
 
 ## Streaming behavior
 

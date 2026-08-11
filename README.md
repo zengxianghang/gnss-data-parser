@@ -7,55 +7,21 @@ The repository is intended to be the **single source of truth** for raw GNSS log
 ## Design principles
 
 1. **Parsing only** — convert raw logs into structured records; do not put project-specific accuracy analysis or plotting here.
-2. **Streaming first** — parsers should provide `iter_*` APIs so multi-GB logs can be processed without loading the whole file into memory.
-3. **Convenience second** — `read_*` helpers may collect iterator output for small files and interactive work.
-4. **Stable field names** — downstream analysis should depend on normalized field names, not vendor-specific column positions.
-5. **Preserve raw timing** — keep GNSS week and seconds-of-week when available; do not silently round or interpolate epochs.
-6. **No hidden filtering** — parser-specific status filtering must be explicit and documented.
-7. **Test with representative lines** — every supported message type should have valid, malformed, boundary and regression cases.
-8. **PR workflow** — changes are developed on branches and merged through pull requests; `main` is the approved parser baseline.
-
-## Layout
-
-```text
-gnss-data-parser/
-├─ python/
-│  └─ gnss_parser/
-│     ├─ common/
-│     ├─ novatel/
-│     └─ ublox/
-├─ matlab/
-├─ cpp/
-├─ docs/
-└─ tests/
-```
+2. **Streaming first** — parsers provide `iter_*` APIs so multi-GB logs can be processed without loading the whole file.
+3. **Convenience second** — `read_*` helpers may collect iterator output for small files.
+4. **Stable field names** — downstream analysis depends on normalized semantics, not vendor column positions.
+5. **Preserve raw timing** — do not silently round, interpolate or replace source time tags.
+6. **No hidden filtering** — quality/status filtering belongs to callers.
+7. **Test representative cases** — valid, malformed, boundary and regression samples.
+8. **PR workflow** — `main` is the approved parser baseline.
 
 ## Python package
 
-The package currently has no third-party runtime dependency.
+No third-party runtime dependency is required.
 
 ```bash
 python -m unittest discover -s tests -v
 ```
-
-For local imports without installing the package, add `python/` to `PYTHONPATH`. Packaging metadata is provided in `pyproject.toml` for editable installation when desired.
-
-## Parser API convention
-
-```python
-from gnss_parser.novatel import iter_psrvel, iter_range
-
-for record in iter_psrvel("receiver.log"):
-    process(record)
-
-for epoch in iter_range("receiver.log"):
-    for obs in epoch.observations:
-        process_observation(obs)
-```
-
-`iter_*` is the primary API for large files. `read_*` is a convenience wrapper that returns all records.
-
-See [`docs/parser_interface.md`](docs/parser_interface.md) for the detailed contract.
 
 ## Supported parsers
 
@@ -66,27 +32,18 @@ See [`docs/parser_interface.md`](docs/parser_interface.md) for the detailed cont
 - optional NovAtel CRC32 verification
 - `PSRVELA`
 - `RANGEA`, including decoded channel tracking status
+- `INSPVAA`, preserving both header time and exact INS data-block applicability time
 
-Example RANGE quality fields:
+Typical large-file usage:
 
 ```python
-from gnss_parser.novatel import iter_range
+from gnss_parser.novatel import iter_inspva, iter_psrvel, iter_range
 
-for epoch in iter_range("receiver.log"):
-    for obs in epoch.observations:
-        print(
-            epoch.week,
-            epoch.sow,
-            obs.prn,
-            obs.tracking.satellite_system_name,
-            obs.tracking.signal_name,
-            obs.cn0_dbhz,
-            obs.lock_time_s,
-            obs.tracking.phase_locked,
-        )
+for record in iter_inspva("receiver.log"):
+    print(record.week, record.sow, record.vel_n_mps, record.vel_e_mps, record.vel_u_mps)
 ```
 
-See [`docs/novatel.md`](docs/novatel.md) for field semantics and timing behavior.
+See [`docs/parser_interface.md`](docs/parser_interface.md) and [`docs/novatel.md`](docs/novatel.md).
 
 ## Message roadmap
 
@@ -95,7 +52,7 @@ NovAtel:
 - [x] common standard ASCII header
 - [x] PSRVEL
 - [x] RANGE
-- [ ] INSPVA
+- [x] INSPVA
 - [ ] BESTPOS
 - [ ] BESTVEL
 
@@ -103,8 +60,6 @@ u-blox / NMEA:
 
 - [ ] RMC
 
-Additional formats should be added only with format documentation and tests.
-
 ## Versioning
 
-Until the first stable parser set is available, development is pre-1.0. Breaking parser-interface changes should be called out explicitly in pull requests.
+Development remains pre-1.0 until the initial parser set is stable.
