@@ -1,6 +1,6 @@
 # gnss-data-parser
 
-Reusable parsers for fixed-format GNSS logs and the **single source of truth** for raw parsing shared by analysis projects and ChatGPT conversations.
+Reusable streaming parsers for fixed-format GNSS receiver logs, with consistent Python/MATLAB semantics and cross-language validation.
 
 ## Core rules
 
@@ -171,3 +171,16 @@ The cross-language MATLAB regression and real-log JSON validation require `jsond
 See [`docs/parser_interface.md`](docs/parser_interface.md), [`docs/novatel.md`](docs/novatel.md), [`docs/ublox.md`](docs/ublox.md), and [`matlab/README.md`](matlab/README.md).
 
 Development remains pre-1.0 until the parser interfaces have been exercised against representative real logs.
+
+## Related GNSS tools
+
+This repository is part of a set of focused public GNSS engineering tools:
+
+- [`gnss-data-simulator`](https://github.com/zengxianghang/gnss-data-simulator) — deterministic GNSS receiver-data simulation and RTKLIB-based validation.
+- [`FastExtractor`](https://github.com/zengxianghang/FastExtractor) — high-performance GPST-window extraction for large NovAtel/Unicore logs.
+- [`LogMerger`](https://github.com/zengxianghang/LogMerger) — time-ordered GNSS log merging for NovAtel/Unicore data.
+- [`RTKLIB`](https://github.com/zengxianghang/RTKLIB) — the RTKLIB fork used by simulator integration and validation work.
+
+## License
+
+Original `gnss-data-parser` code is licensed under the [MIT License](LICENSE).
